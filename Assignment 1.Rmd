@@ -1,0 +1,272 @@
+---
+title: "Assignment 1"
+author: "Mohammad Anas"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+# Question 1
+## Part1
+When we conduct exploratory data analysis, we see that as age increases there is a a gradual decrease in the heart rate. This is clearly visible from the box plot shown.
+
+
+```{r setup, echo=FALSE, warning=FALSE}
+respiratory <- read.csv("/Users/mohammadanas/Desktop/Duke MIDS/Fall 2021/MODELLING AND REPRESENTATION OF DATA/Assignment 1/Respiratory.csv",
+                 stringsAsFactors = FALSE, sep = ",",
+                 dec=",",nrows=618)
+respiratory <- subset(respiratory, select = c("Age","Rate"))
+respiratory$Age <- as.numeric(respiratory$Age)
+respiratory$Age_years <- '0-1'
+respiratory$Age_years[respiratory$Age >= 12 & respiratory$Age < 24] <- '1-2'
+respiratory$Age_years[respiratory$Age >= 24 & respiratory$Age < 36] <- '3-6'
+library(ggplot2)
+box_plot <- ggplot(respiratory, aes(x = Age_years, y =Rate)) +geom_boxplot()
+plot(box_plot)
+```
+
+## Part 2
+
+We will use a simple linear regression equation to predict rate from age.
+
+
+\begin{equation}
+	Rate_{t} = \beta_{0}+\beta_{1}*Age_{t}.
+\end{equation}
+
+
+## Part 3
+
+According to our model, an increase in 1 unit(month) of Age leads to a decrease of 0.6957 units on average in the heart rate. As the p-value for this coeffecient is small, the age is a statistically significant coeeficient.The intercept was found to be 47.05, which according to our model is the heart rate if the age is zero. As this is counter intuitive, I centered the data and ran the regression. This resulted in an intercept of 1.597e-15. This means a child with an age of 13.39(mean age) months will have the heart rate of 1.597e-15 on average. However as the p-value for the intercept coefficient was 1 (only in the case of centered data), we assume this is statistically insignificant.
+
+## Part 4
+
+Here are the results of regression run on the non centered data.
+
+
+```{r, fig_height = 3, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+library(stargazer)
+reg_rate <- lm(Rate ~ Age, data = respiratory)
+stargazer(reg_rate ,title= "Results", header=FALSE, type='latex',digits = 2)
+```
+
+## Part 5
+
+When assessing the model we notice that the linearity assumption has been violated as we see somewhat increasing trend in the "Residuals vs Age" plot.
+
+```{r, fig.height= 3 ,results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+graph_of <- ggplot(respiratory, aes(x = Age, y = reg_rate$residual)) +geom_point() + ggtitle('Residuals Vs Age') + theme(plot.title = element_text(hjust = 0.5))
+plot(graph_of)
+```
+
+To improve our model, I took the log of the Rate variable and then tested the model for the assumption of linearity. We do see that the data points are more randomly scattered and we seem good with the linearity assumption.
+
+```{r, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+respiratory$Ratelog <- log(respiratory$Rate)
+logreg_rate <- lm(Ratelog ~ Age, data = respiratory)
+graph_ofl <- ggplot(respiratory, aes(x = Age, y = logreg_rate$residual)) +geom_point() + ggtitle('Residuals Vs Age') + theme(plot.title = element_text(hjust = 0.5))
+plot(graph_ofl)
+```
+
+We notice below by looking at the "Residuals vs Fitted" plot that the variance of residuals are almost constant across all fitted values. Secondly, we see some randomness in the plot, so it is safe to say that the constant variance assumption and the independence assumption have been satisfied by our model. 
+
+```{r, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+logreg_rate <- lm(Ratelog ~ Age, data = respiratory)
+plot(logreg_rate, which=1)
+```
+
+By observing the QQ-Plot we notice that the normality assumption has also not been violated. The QQ-Plot can be seen below.
+
+```{r, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+plot(logreg_rate, which=2)
+```
+
+
+
+## Part 6
+
+Below provided are the prediction intervals and the predicted values of Rate, as estimated by our model. The prediction interval for each age tells us that if we take a large number of babies with the same age, 95% of the time, the heart rate for the babies will fall within that prediction interval. The row of the table below present the prediction intervals in the order of 1,18,29.
+
+```{r, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+new_data <- data.frame(Age = c(1,18,29))
+
+predicted_Values <- predict(logreg_rate, new_data, interval = 'prediction')[,c(1,2,3)]
+new <- exp(predicted_Values)
+stargazer(new, type ='latex', title = 'Prediction Intervals', header = FALSE, digits = 2)
+```
+
+# Question 2
+
+## Part 1
+
+The data point corresponding to the county Palm Beach is clearly an outlier. The number of votes received in that county are significantly greater than other counties. The number is clearly way more than expected and serves as an evidence that something was wrong.
+
+
+```{r, fig.height =3, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+elections <- read.csv("/Users/mohammadanas/Desktop/Duke MIDS/Fall 2021/MODELLING AND REPRESENTATION OF DATA/Assignment 1/Elections.csv",
+                        stringsAsFactors = FALSE, sep = ",",
+                        dec=",")
+elections <- subset(elections, select = c(2,3,4))
+elect_wo_pb <- elections[!(elections$County == 'Palm Beach'),]
+new_data <- elections[(elections$County == 'Palm Beach'),]
+library(scales)
+ggplot(data = elect_wo_pb, aes(x = Bush2000, y = Buchanan2000)) + geom_point() + scale_x_continuous(labels = comma) + geom_point(data = new_data, aes(x = Bush2000, y = Buchanan2000, color='Palm Beach'),size=4)
+
+
+```
+
+
+## Part 2
+
+The double log linear regression model was used to fit the data as it resulted in a lower Root Mean Square Error. Both x and y variables were transformed to the natural log scale as using them without transformation of these variables, we see violation of the linearity assumption. 
+
+## Part 3
+
+The transformation of both variables to a logarithmic scale resulted in a better fit for the model. If we see at the "Residuals vs Log(Bush2000)" graph below, we are unable to find a clear pattern. This model ssems to satisfy the linearity assumption better than the model without the tranformation of y variable to log. 
+
+```{r,fig.height = 3, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+elect_wo_pb$Buchanan2000_log <- log(elect_wo_pb$Buchanan2000)
+elect_wo_pb$Bush2000_log <- log(elect_wo_pb$Bush2000)
+
+
+t_reg <- lm(Buchanan2000_log ~ Bush2000_log, data = elect_wo_pb)
+
+library(ggplot2)
+ggplot(elect_wo_pb, aes(x = Bush2000, y = t_reg$residual)) +geom_point() + ggtitle('Residuals vs Log(Bush2000)') + theme(plot.title = element_text(hjust = 0.5)) + scale_x_continuous(labels = comma) 
+```
+
+We also notice that the residuals' variance remains somewhat constant and as scatter plot "Residuals vs Fitted" shows the points are randomly distributed, the independence assumption also seems to be not violated. However, we do need more data points to better asses these assumptions
+
+```{r, fig.height = 4, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+plot(t_reg, which = 1)
+```
+
+Lastly, the QQ Plot below indicated that the normality assumption was not violated as well.
+
+```{r,fig.height= 4, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+plot(t_reg, which = 2)
+```
+
+The table below indicated the results of the regression model. The coefficient suggest that a one percent increase in the votes received by Bush leads to 0.73% increase in the votes received by Buchanan.It can also be noted that the adjusted R-squared and F-statistic for the model are high.
+
+```{r, fig.height =3, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+t_reg <- lm(Buchanan2000_log ~ Bush2000_log, data = elect_wo_pb)
+stargazer(t_reg, type ='latex', title = 'Double Log Linear Regression Results', header = FALSE, digits = 2)
+```
+
+## Part 4
+ 
+The predicted interval corresponds to the fact that if a large sample of counties was selected and within those counties Bush received the same number of votes he received in Palm County, than in 95% of the counties the number of votes received by Buchanan would be within the prediction interval below.
+
+```{r, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+new_data$Bush2000_log <- log(new_data$Bush2000)
+predicted_Values <- predict(t_reg, new_data, interval = 'prediction')
+predicted_exp <- exp(predicted_Values)[,c(1,2,3)]
+stargazer(predicted_exp, type ='latex', title = 'Double Log Linear Regression Results', header = FALSE, digits = 2)
+```
+# Question 3
+
+## Part 1
+During the EDA, it was observed that the price variable was not normally distributed. Therefore, I took the log of price which had a normal distribution.
+
+```{r,fig.align = "center", fig.height=2, fig.width=3, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+airbnb_data <- read.table("/Users/mohammadanas/Desktop/Duke MIDS/Fall 2021/MODELLING AND REPRESENTATION OF DATA/Assignment 1/Listings_QueenAnne.txt",header = TRUE,sep="",dec =".")
+airbnb_data$price_log <- log(airbnb_data$price)
+ggplot(data = airbnb_data, aes(x=price_log)) + geom_histogram(bins =20) + ggtitle('Price_log Histogram') + theme(plot.title = element_text(hjust = 0.5))
+```
+
+After that, we run a multiple linear regression on the log_price variable. The results of which are shown below. 
+
+```{r, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+reg_price <- lm(price_log ~ host_is_superhost + host_identity_verified + room_type + accommodates + bathrooms + bedrooms, data = airbnb_data)
+stargazer(reg_price, type ='latex', title = 'log-Linear Regression Results', header = FALSE, digits = 2)
+```
+
+To test the linearity assumption, we create a scatter plot of the non-categorical predictors against log of Price which can be seen below. As integer variables behave like categorical variables, It is difficult to assess linearity using the "Residuals vs Predictor" plot. Therefore, we choose to use a normal scatter plot of predictors against our dependant variable.
+
+```{r, fig.height = 2.5 ,results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(data = airbnb_data, aes(x = bedrooms, y = price_log)) + geom_point() + geom_smooth(method = lm)+ ggtitle('Price_log vs Bedrooms') + theme(plot.title = element_text(hjust = 0.5)) + theme(aspect.ratio=1/2)
+ggplot(data = airbnb_data, aes(x = bathrooms, y = price_log)) + geom_point() + geom_smooth(method = lm)+ ggtitle('Price_log vs Bathrooms') + theme(plot.title = element_text(hjust = 0.5)) + theme(aspect.ratio=1/2)
+ggplot(data = airbnb_data, aes(x = accommodates, y = price_log)) + geom_point() + geom_smooth(method = lm)+ ggtitle('Price_log vs Accommodates') + theme(plot.title = element_text(hjust = 0.5)) + theme(aspect.ratio=1/2)
+```
+
+The above graphs indicate that the linearity assumption is somewhat satisfied. We use a QQ-Plot to check for the normality assumptions. The plot below indicates that the normality assumption is satisfied as well.
+
+```{r, fig.height=4, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+plot(reg_price, which = 2)
+```
+
+Lastly, we check for the independence and constant variance assumption by taking a look at the "Residuals vs Fitted" plot. Given that the points are randomly scattered, the assumption for independence has not been violated.
+
+```{r, fig.height = 4, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+plot(reg_price, which = 1)
+```
+
+## Part 3
+
+When host is a super host the price of the house on average seems to decrease by 0.9%. According to our model the price also decreases by 9.6% when the host's identity has been verified. As compared to houses with room type as 'entire home', the house with private rooms seem to be 45% cheaper and houses with shared rooms are 27% expensive. These seems to be counter intuitive results. 
+One unit increase in accommodates leads to 4% increase in the price. Increase in one bathroom is associated with 13% increase in price and increase in one bedroom leads to a 21% increase in price. We assume that all other variable are held constant while making interpretation of each coefficient.
+The p-values for the variables host_is_super host and room_type (shared_room) are large and are thus statistically insignificant.
+
+## Part 4
+
+The model does contain influential points, outliers and leverage points. The point with leverage greater than 0.045 are the leverage points. This threshold has been calculated by using the formula below where p is the number of predictors and n is the number of data observations:
+
+\begin{equation}
+Thresh-hold = \frac{2*(p + 1)}{n}
+\end{equation}
+
+ We observe the "Residuals vs Leverage" plot to identify these points.By looking at the the plot we see that there are several leverage points in our data that are not influential points. The plot indicates that point 31, 72 and 138 are outliers, however, the only the points 31 and 138 are influential points as they have a Cook's distance greater than 1. The plot is shown below.
+ 
+```{r, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+plot(reg_price, which = 5)
+```
+
+Now we exclude the influential points from the data and re-run the regression.The results are as follows:
+
+```{r, resize.width = 10, results= "asis", echo=FALSE, warning=FALSE, message=FALSE}
+outliers_influential <- c(31,72,138)
+rem_data <- airbnb_data[-outliers_influential,]
+reg_price_rem <- lm(price_log ~ host_is_superhost + host_identity_verified + room_type + accommodates + bathrooms + bedrooms, data = rem_data)
+stargazer(reg_price_rem, type ='latex', title = 'log-Linear Regression Results', header = FALSE, digits = 2, no.space = TRUE)
+```
+
+The major changes we note are in the p-values which have decreased a little bit. However, if we assume a 95% confidence interval, the variables host_is_superhost, house identity verified and room_type (shared) are still statistically insignificant. The p-value for the variable accommodates has increased as well. There are no major changes in the values of the beta coefficients after removal of outlines and influential points.
+
+
+
+
+## Part 5
+
+There are 2 major limitations:
+
+
+1. One Major limitation of the model here is that even the integer predictor variables here behave as categorical variables. This makes it difficult to test the assumption of linearity.
+2. When we observe the "Residuals vs Fitted", we notice that the constant variance assumption has been violated by our model. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
